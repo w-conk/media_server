@@ -1,0 +1,32 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Sensitive configuration files
+*-secrets.yaml
+*-private.yaml
+*.env
+.env*
+.env
+
+# Docker volumes and data
+/docker/
+/container/
+/mnt/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup files
+*.bak
+*.backup

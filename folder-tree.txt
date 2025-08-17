@@ -1,0 +1,25 @@
+.
+└── mediastack
+    ├── config
+    │   ├── bazarr
+    │   ├── jackett
+    │   ├── lidarr
+    │   ├── plex
+    │   ├── qbittorrent
+    │   ├── radarr
+    │   ├── sonarr
+    │   ├── tautulli
+    │   └── vpn
+    └── library
+        ├── downloads
+        │   ├── nzbget
+        │   │   ├── completed
+        │   │   ├── incomplete
+        │   │   └── torrents
+        │   └── qbittorrent
+        │       ├── completed
+        │       ├── incomplete
+        │       └── torrents
+        ├── movies
+        ├── music
+        └── tvshows

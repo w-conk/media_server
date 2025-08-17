@@ -1,0 +1,237 @@
+# Combined media stack configuration
+networks:
+  servarrnetwork:
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
+
+services:
+  # VPN and Download Management
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.2
+    ports:
+      - 8080:8080
+      - 6881:6881
+      - 6789:6789
+      - 9696:9696
+    volumes:
+      - /docker/gluetun:/gluetun
+    environment:
+      - VPN_SERVICE_PROVIDER=airvpn
+      - VPN_TYPE=wireguard
+      - FIREWALL_VPN_INPUT_PORTS=58784
+      - FIREWALL_OUTBOUND_SUBNETS=10.10.0.0/24
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_PRESHARED_KEY=${WIREGUARD_PRESHARED_KEY}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - SERVER_COUNTRIES=United States
+      - SERVER_CITIES=Chicago Illinois
+      - HEALTH_VPN_DURATION_INITIAL=120s
+    healthcheck:
+      test: ping -c 1 www.google.com || exit 1
+      interval: 60s
+      timeout: 20s
+      retries: 5
+    restart: unless-stopped
+
+  deunhealth:
+    image: qmcgaw/deunhealth
+    container_name: deunhealth
+    network_mode: "none"
+    environment:
+      - LOG_LEVEL=info
+      - HEALTH_SERVER_ADDRESS=127.0.0.1:9999
+      - TZ=America/Chicago
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    user: "1000:1000"
+    restart: unless-stopped
+    labels:
+      - deunhealth.restart.on.unhealthy= "true"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    volumes:
+      - /container/mediastack/config/qbittorrent:/config
+      - /mnt/nvme/mediastack/library:/data
+    network_mode: service:gluetun
+    healthcheck:
+      test: ping -c 1 www.google.com || exit 1
+      interval: 60s
+      retries: 3
+      start_period: 20s
+      timeout: 10s
+
+  nzbget:
+    image: lscr.io/linuxserver/nzbget:latest
+    container_name: nzbget
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - NZBGET_USER=user
+      - NZBGET_PASS=password
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /container/mediastack/config/nzbget:/config
+      - /mnt/nvme/mediastack/library:/data
+    restart: unless-stopped
+    network_mode: service:gluetun
+
+  # Media Management
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    user: "1000:1000"
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /container/mediastack/config/sonarr:/config
+      - /mnt/nvme/mediastack/library:/data
+    ports:
+      - 8989:8989
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.3
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    user: "1000:1000"
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /container/mediastack/config/radarr:/config
+      - /mnt/nvme/mediastack/library:/data
+    ports:
+      - 7878:7878
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.4
+
+  lidarr:
+    container_name: lidarr
+    image: lscr.io/linuxserver/lidarr:latest
+    user: "1000:1000"
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /container/mediastack/config/lidarr:/config
+      - /mnt/nvme/mediastack/library:/data
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    ports:
+      - 8686:8686
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.5
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    user: "1000:1000"
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /container/mediastack/config/bazarr:/config
+      - /mnt/nvme/mediastack/library:/data
+    ports:
+      - 6767:6767
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.6
+
+  # Media Server
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    user: "1000:1000"
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM}
+    ports:
+      - 32400:32400
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /container/mediastack/config/plex:/config
+      - /mnt/nvme/mediastack/library:/data
+    restart: unless-stopped
+
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /container/mediastack/config/overseerr:/config
+      - /mnt/nvme/mediastack/library:/data
+    ports:
+      - 5055:5055
+    restart: unless-stopped
+
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /container/mediastack/config/tautulli:/config
+    ports:
+      - 8181:8181
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /container/mediastack/config/prowlarr:/config
+    restart: unless-stopped
+    network_mode: service:gluetun
