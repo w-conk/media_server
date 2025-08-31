@@ -1,0 +1,28 @@
+# Home Assistant Docker Compose configuration
+networks:
+  homeassistant_network:
+    ipam:
+      config:
+        - subnet: 10.20.0.0/24
+
+services:
+  homeassistant:
+    image: lscr.io/linuxserver/homeassistant:latest
+    container_name: homeassistant
+    restart: unless-stopped
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      - ./config/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 8123:8123
+    networks:
+      homeassistant_network:
+        ipv4_address: 10.20.0.2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
