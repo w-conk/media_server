@@ -10,6 +10,8 @@ services:
   gluetun:
     image: qmcgaw/gluetun
     container_name: gluetun
+    labels:
+      - deunhealth.restart.on.unhealthy=true
     cap_add:
       - NET_ADMIN
     devices:
@@ -60,7 +62,7 @@ services:
     user: "1000:1000"
     restart: unless-stopped
     labels:
-      - deunhealth.restart.on.unhealthy= "true"
+      - deunhealth.restart.on.unhealthy=true
     environment:
       - PUID=1000
       - PGID=1000
@@ -69,7 +71,7 @@ services:
       - TORRENTING_PORT=6881
     volumes:
       - /container/mediastack/config/qbittorrent:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     network_mode: service:gluetun
     healthcheck:
       test: ping -c 1 www.google.com || exit 1
@@ -87,11 +89,11 @@ services:
       - PGID=1000
       - TZ=America/Chicago
       - NZBGET_USER=user
-      - NZBGET_PASS=password
+      - NZBGET_PASS=${NZBGET_PASS}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /container/mediastack/config/nzbget:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     restart: unless-stopped
     network_mode: service:gluetun
 
@@ -108,7 +110,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /container/mediastack/config/sonarr:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     ports:
       - 8989:8989
     networks:
@@ -127,7 +129,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /container/mediastack/config/radarr:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     ports:
       - 7878:7878
     networks:
@@ -142,7 +144,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /container/mediastack/config/lidarr:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     environment:
       - PUID=1000
       - PGID=1000
@@ -165,7 +167,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /container/mediastack/config/bazarr:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     ports:
       - 6767:6767
     networks:
@@ -190,7 +192,7 @@ services:
       - /dev/dri:/dev/dri
     volumes:
       - /container/mediastack/config/plex:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     restart: unless-stopped
 
   overseerr:
@@ -203,7 +205,7 @@ services:
       - TZ=America/Chicago
     volumes:
       - /container/mediastack/config/overseerr:/config
-      - /mnt/nvme/mediastack/library:/data
+      - /mnt/nas/mediastack/library:/data
     ports:
       - 5055:5055
     restart: unless-stopped
@@ -222,6 +224,21 @@ services:
       - 8181:8181
     restart: unless-stopped
 
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    volumes:
+      - /container/mediastack/config/navidrome:/data
+      - /mnt/nas/mediastack/library:/music:ro
+    ports:
+      - 4533:4533
+    restart: unless-stopped
+
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
@@ -235,3 +252,33 @@ services:
       - /container/mediastack/config/prowlarr:/config
     restart: unless-stopped
     network_mode: service:gluetun
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.11
+    volumes:
+      - /container/mediastack/config/redis:/data
+
+  dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:latest
+    container_name: dispatcharr
+    restart: unless-stopped
+    ports:
+      - 9191:9191
+    volumes:
+      - /container/mediastack/config/dispatcharr:/data
+    environment:
+      - DISPATCHARR_ENV=aio
+      - REDIS_HOST=redis
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DISPATCHARR_LOG_LEVEL=info
+      - TZ=America/Chicago
+    networks:
+      servarrnetwork:
+        ipv4_address: 10.10.0.12
+    depends_on:
+      - redis
