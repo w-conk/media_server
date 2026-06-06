@@ -13,9 +13,5 @@ services:
       - "81:81"
       - "443:443"
     volumes:
-      - npm-data:/data
-      - npm-letsencrypt:/etc/letsencrypt
-
-volumes:
-  npm-data:
-  npm-letsencrypt:
+      - /home/conk/docker/nginx-proxy-manager/data:/data
+      - /home/conk/docker/nginx-proxy-manager/letsencrypt:/etc/letsencrypt

@@ -7,7 +7,7 @@ services:
     environment:
       - TZ=America/Chicago
     volumes:
-      - /data/compose/5/config/homeassistant:/config
+      - /home/conk/docker/homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
     network_mode: host
     healthcheck:
